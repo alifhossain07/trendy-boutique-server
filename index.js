@@ -40,7 +40,7 @@ async function run() {
         res.status(500).json({ message: "Failed to fetch products", error });
       }
     });
-    
+
     // POST endpoint to add item to cart
     app.post("/cart", async (req, res) => {
       try {
@@ -53,9 +53,7 @@ async function run() {
         });
 
         if (existingItem) {
-          return res
-            .status(409)
-            .json({ message: "Item already exists in cart" }); // 409 Conflict
+          return res.status(409).json({ message: "Item already exists in cart" }); // 409 Conflict
         }
 
         const newCartItem = {
@@ -66,9 +64,7 @@ async function run() {
           createdAt: new Date(), // Add timestamp if needed
         };
         const result = await cartCollection.insertOne(newCartItem);
-        res
-          .status(201)
-          .json({ message: "Item added to cart", itemId: result.insertedId });
+        res.status(201).json({ message: "Item added to cart", itemId: result.insertedId });
       } catch (error) {
         res.status(500).json({ message: "Failed to add item to cart", error });
       }
@@ -98,9 +94,7 @@ async function run() {
         });
 
         if (existingItem) {
-          return res
-            .status(409)
-            .json({ message: "Item already exists in wishlist" }); // 409 Conflict
+          return res.status(409).json({ message: "Item already exists in wishlist" }); // 409 Conflict
         }
 
         const newWishlistItem = {
@@ -111,14 +105,9 @@ async function run() {
           createdAt: new Date(), // Add timestamp if needed
         };
         const result = await wishlistCollection.insertOne(newWishlistItem);
-        res.status(201).json({
-          message: "Item added to wishlist",
-          itemId: result.insertedId,
-        });
+        res.status(201).json({ message: "Item added to wishlist", itemId: result.insertedId });
       } catch (error) {
-        res
-          .status(500)
-          .json({ message: "Failed to add item to wishlist", error });
+        res.status(500).json({ message: "Failed to add item to wishlist", error });
       }
     });
 
@@ -134,12 +123,143 @@ async function run() {
       }
     });
 
-    // Log successful connection to MongoDB
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // Express route for removing an item from the cart
+    app.delete("/cart", async (req, res) => {
+      const { userEmail, productId } = req.query;
+      try {
+        // Convert productId to ObjectId
+        const result = await cartCollection.deleteOne({
+          userEmail,
+          _id: new ObjectId(productId),
+        });
+
+        if (result.deletedCount === 1) {
+          res.status(200).json({ message: "Item removed from cart" });
+        } else {
+          res.status(404).json({ message: "Item not found" });
+        }
+      } catch (error) {
+        res.status(500).json({ message: "Error removing item from cart", error });
+      }
+    });
+
+    // Express route for removing an item from the wishlist
+    app.delete("/wishlist", async (req, res) => {
+      const { userEmail, productId } = req.query; // Changed to use productId
+      try {
+        const result = await wishlistCollection.deleteOne({
+          userEmail,
+          _id: new ObjectId(productId), // Ensure ObjectId is used for productId
+        });
+        if (result.deletedCount === 1) {
+          res.status(200).json({ message: "Item removed from wishlist" });
+        } else {
+          res.status(404).json({ message: "Item not found" });
+        }
+      } catch (error) {
+        res.status(500).json({ message: "Error removing item from wishlist", error });
+      }
+    });
+
+    // Express route for updating a product in the database
+    app.put("/products/:id", async (req, res) => {
+      const productId = req.params.id;
+      const updatedProduct = req.body;
+
+      try {
+        const result = await trendyBoutique.updateOne(
+          { _id: new ObjectId(productId) }, // Find the product by ID
+          { $set: updatedProduct } // Set the updated fields
+        );
+
+        if (result.modifiedCount === 1) {
+          res.status(200).json({ message: "Product updated successfully" });
+        } else {
+          res.status(404).json({ message: "Product not found or no changes made" });
+        }
+      } catch (error) {
+        res.status(500).json({ message: "Error updating product", error });
+      }
+    });
+
+    // DELETE endpoint for removing a product
+    app.delete("/products/:id", async (req, res) => {
+      const productId = req.params.id;
+
+      try {
+        // Ensure the ID is a valid ObjectId
+        if (!ObjectId.isValid(productId)) {
+          return res.status(400).json({ error: "Invalid product ID" });
+        }
+
+        // Delete the product from the database
+        const result = await trendyBoutique.deleteOne({ _id: new ObjectId(productId) });
+
+        // Check if a document was deleted
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ error: "Product not found" });
+        }
+
+        res.status(200).json({ message: "Product deleted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "An error occurred while deleting the product" });
+      }
+    });
+
+    // POST endpoint to add a new product
+    app.post("/products", async (req, res) => {
+      try {
+        // Extract product data from request body
+        const {
+          productName,
+          image,
+          category,
+          subcategory,
+          price,
+          discount,
+          rating,
+          details,
+          adminEmail,
+          isStock,
+          productQuantity,
+          isDiscount,
+        } = req.body;
+
+        // Create a new product object
+        const newProduct = {
+          productName,
+          image,
+          category,
+          subcategory,
+          price: parseFloat(price), // Convert price to a number
+          discount,
+          rating: parseFloat(rating), // Convert rating to a number
+          details,
+          adminEmail,
+          isStock: isStock === true, // Ensure boolean
+          productQuantity: parseInt(productQuantity), // Convert to number
+          isDiscount: isDiscount === true, // Ensure boolean
+          createdAt: new Date(), // Optional: Add creation date
+        };
+
+        // Insert new product into the collection
+        const result = await trendyBoutique.insertOne(newProduct);
+
+        // Respond with success and the inserted product's ID
+        res.status(201).json({
+          message: "Product added successfully!",
+          productId: result.insertedId,
+        });
+      } catch (error) {
+        // Handle errors and respond with an error message
+        res.status(500).json({ message: "Failed to add product", error });
+      }
+    });
+
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
-    // Ensures that the client will close when you finish/error
+    // Ensure that the client will close when you finish/error
     // await client.close();
   }
 }
