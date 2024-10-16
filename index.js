@@ -1,8 +1,10 @@
 const express = require("express");
 const cors = require("cors");
+
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const jwt = require("jsonwebtoken");
+
+
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -10,6 +12,7 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json()); // This allows parsing JSON from request body
+
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_USER_PASSWORD}@basicsexploring.cgr22.mongodb.net/?retryWrites=true&w=majority&appName=basicsExploring`;
 
@@ -22,14 +25,18 @@ const client = new MongoClient(uri, {
   },
 });
 
+
+
 async function run() {
   try {
     // Connect the client to the server
     await client.connect();
     const database = client.db("trendyBoutique");
+    
     const trendyBoutique = database.collection("products");
     const cartCollection = database.collection("cart");
     const wishlistCollection = database.collection("wishlist");
+    const usersCollection = database.collection("users");
 
     // Get All Products
     app.get("/products", async (req, res) => {
@@ -209,7 +216,10 @@ async function run() {
     });
 
     // POST endpoint to add a new product
-    app.post("/products", async (req, res) => {
+    app.post("/products",  async (req, res) => {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Access denied" });
+          }
       try {
         // Extract product data from request body
         const {
@@ -257,6 +267,101 @@ async function run() {
         res.status(500).json({ message: "Failed to add product", error });
       }
     });
+    // User Registration Endpoint
+app.post("/register", async (req, res) => {
+    const { email, name, photoURL } = req.body;
+  
+    const newUser = { email, name, photoURL, role: 'user' }; // Default role
+  
+    try {
+      await usersCollection.insertOne(newUser);
+      res.status(201).json({ message: "User registered successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Registration failed", error });
+    }
+  });
+  
+  // User Login Endpoint
+  app.post("/login", async (req, res) => {
+    const { email } = req.body;
+  
+    const user = await usersCollection.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email" });
+    }   
+
+  });
+
+//   Payment API Post API
+
+// app.post("/order", async (req, res) => {
+//     // Extract order details from the request body
+//     const {
+//         fullName,
+//         email,
+//         userAddress,
+//         userCity,
+//         zipCode,
+//         totalPrice,
+//         products,
+//         phoneNumber,
+//     } = req.body;
+
+//     const productDetails = products.map(item => {
+//         return `Product ID: ${item.productId}, Quantity: ${item.quantity}`;
+//     }).join("; ");
+
+//     const data = {
+//         total_amount: parseFloat(totalPrice), // Ensure this is a number
+//         currency: 'BDT',
+//         tran_id: `REF${Date.now()}`, // Use a unique tran_id for each API call
+//         success_url: 'http://localhost:3030/success',
+//         fail_url: 'http://localhost:3030/fail',
+//         cancel_url: 'http://localhost:3030/cancel',
+//         ipn_url: 'http://localhost:3030/ipn',
+//         shipping_method: 'Courier',
+//         product_name: productDetails, // Combine product IDs as a string
+//         cus_name: fullName,
+//         cus_email: email,
+//         cus_phone: phoneNumber,
+//         cus_postcode: zipCode,
+//         cus_city: userCity, // Include city for billing
+//         ship_name: fullName,
+//         ship_address: userAddress, // Add shipping address
+//         ship_city: userCity, // Add shipping city
+//         ship_postcode: zipCode, // Add shipping postcode
+//         ship_country: 'Bangladesh', // Specify country
+//         ship_add1: userAddress, // Add shipping address line 1
+//         ship_add2: '', // Optional: additional shipping address line
+//         ship_country: 'Bangladesh', // Ensure country is specified
+//         ship_phone: phoneNumber, // Add shipping phone number
+//         // Additional fields based on SSLCommerz requirements
+//         // ship_state: '', // Optional: state
+//         // ship_district: '', // Optional: district
+//     };
+
+//     const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+
+//     try {
+//         const apiResponse = await sslcz.init(data);
+//         console.log('API Response:', apiResponse); // Log the API response
+
+//         if (apiResponse.GatewayPageURL) {
+//             let GatewayPageURL = apiResponse.GatewayPageURL;
+//             res.json({ paymentUrl: GatewayPageURL }); // Send the payment URL back to the client
+//             console.log('Redirecting to: ', GatewayPageURL);
+//         } else {
+//             res.status(500).json({ error: "Unable to get payment URL" });
+//         }
+//     } catch (error) {
+//         console.error("SSLCommerz initialization error:", error);
+//         res.status(500).json({ error: "Payment initialization failed" });
+//     }
+// });
+
+
+
+
 
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
