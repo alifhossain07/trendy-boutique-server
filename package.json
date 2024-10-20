@@ -20,5 +20,8 @@
     "mongodb": "^6.9.0",
     "sslcommerz-lts": "^1.1.0",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.7"
   }
 }
